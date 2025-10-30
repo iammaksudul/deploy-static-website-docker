@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: devops-portfolio
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    environment:
+      - NGINX_ENVSUBST_TEMPLATE_SUFFIX=.template
+    networks:
+      - portfolio-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portfolio.rule=Host(`portfolio.local`)"
+      - "traefik.http.services.portfolio.loadbalancer.server.port=8080"
+
+  # Optional: Add a reverse proxy
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+    networks:
+      - portfolio-network
+    restart: unless-stopped
+
+networks:
+  portfolio-network:
+    driver: bridge
+
+volumes:
+  nginx-cache:
+    driver: local
